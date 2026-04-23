@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name            = "sapiens"
+version         = "2.0.0"
+description     = "Sapiens2: high-resolution transformers for human-centric vision tasks"
+readme          = "README.md"
+license         = { file = "LICENSE.md" }
+requires-python = ">=3.12"
+
+dependencies = [
+  "torch>=2.7",
+  "torchvision",
+  "numpy",
+  "opencv-python",
+  "pillow",
+  "safetensors",
+  "tqdm",
+  "scipy",
+  "matplotlib",
+  "iopath",
+  "prettytable",
+  "termcolor",
+  "accelerate",
+  "rich",
+]
+
+classifiers = [
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "License :: Other/Proprietary License",
+  "Operating System :: OS Independent"
+]
+
+[project.optional-dependencies]
+pointmap = ["open3d"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where   = ["."]
+include = ["sapiens*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.pyi", "*.yaml", "*.yml", "*.json", "*.cfg", "*.txt", "*.md"]

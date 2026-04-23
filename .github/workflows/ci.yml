@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install flake8
+        run: pip install flake8 flake8-bugbear
+
+      - name: flake8
+        run: flake8 sapiens/
+
+      - name: shellcheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          severity: error
+          ignore_paths: docs
+
+  build:
+    name: Build & smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install (CPU torch)
+        run: |
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -e . --no-build-isolation
+
+      - name: Smoke test — import + registry
+        run: |
+          python -c "
+          import sapiens
+          assert hasattr(sapiens, 'Sapiens'), 'Sapiens backbone missing'
+          assert hasattr(sapiens, 'Sapiens2'), 'Sapiens2 backbone missing'
+          assert 'Sapiens2' in sapiens.MODELS, 'Sapiens2 not registered'
+          print('Sapiens version:', sapiens.__version__)
+          print('Registered backbones:', sorted(k for k in sapiens.MODELS if 'apien' in k.lower()))
+          "
+
+      - name: Smoke test — Config.fromfile on every config
+        run: |
+          python -c "
+          import glob
+          from sapiens.engine.config import Config
+          fails = 0
+          for p in sorted(glob.glob('sapiens/pose/configs/**/*.py', recursive=True)
+                        + glob.glob('sapiens/dense/configs/**/*.py', recursive=True)):
+              try: Config.fromfile(p)
+              except Exception as e: print(f'FAIL {p}: {e}'); fails += 1
+          assert fails == 0, f'{fails} config(s) failed to load'
+          print('all configs OK')
+          "
