@@ -364,18 +364,25 @@ class GroupedQueryAttention(nn.Module):
             q = self.q_norm(q)
             k = self.k_norm(k)
 
-        # Repeat KV heads if group ratio >1
-        if self.num_kv_heads != self.num_heads:
+        # GQA: prefer SDPA's native broadcast in fp16/bf16 (FLASH/cuDNN have
+        # GQA-aware kernels). For fp32 those backends reject mismatched head
+        # counts and dispatch falls back to MATH — slower than just
+        # materializing K/V — so keep the explicit repeat there.
+        use_gqa = self.num_kv_heads != self.num_heads
+        if use_gqa and q.dtype not in (torch.bfloat16, torch.float16):
             factor = self.num_heads // self.num_kv_heads
             k = k.repeat_interleave(factor, dim=1)
             v = v.repeat_interleave(factor, dim=1)
+            use_gqa = False
 
         if rope is not None:
             q, k = self.apply_rope(q, k, rope)
 
         # Scaled dot-product attention
         attn_out = self.attn_op(
-            q, k, v, dropout_p=self.attn_drop if self.training else 0.0
+            q, k, v,
+            dropout_p=self.attn_drop if self.training else 0.0,
+            enable_gqa=use_gqa,
         )  # (B, num_heads, N, head_dim)
 
         # Merge heads -> (B, N, embed_dims)
